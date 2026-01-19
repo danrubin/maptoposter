@@ -475,17 +475,25 @@ def create_poster(city, country, point, dist, output_file):
     spaced_city = "  ".join(list(city.upper()))
 
     # --- BOTTOM TEXT ---
+    # Typographic hierarchy with proper leading (line spacing)
+    # Based on standard typographic rhythm: 1.5x leading for body, 2x for display
     # Text zorder=15 ensures it appears above gradients (zorder=10)
-    # Vertical spacing: City (0.16) -> Line (0.135) -> Country (0.11) -> Coords (0.07)
-    # Ensures consistent spacing regardless of gradient presence
-    ax.text(0.5, 0.16, spaced_city, transform=ax.transAxes,
+    #
+    # Vertical rhythm (bottom to top):
+    # - Coordinates: 14pt text at y=0.07
+    # - Country: 22pt text at y=0.10 (spacing: ~0.03 = 2x line height ratio)
+    # - Line: decorative element at y=0.125 (0.025 above country)
+    # - City: 60pt text at y=0.14 (spacing: 0.015 below city baseline)
+    #
+    # This maintains ~1.5-2x leading between elements for proper visual rhythm
+
+    ax.text(0.5, 0.14, spaced_city, transform=ax.transAxes,
             color=THEME['text'], ha='center', fontproperties=font_main, zorder=15)
 
-    # Decorative line positioned between city and country with proper spacing
-    ax.plot([0.4, 0.6], [0.135, 0.135], transform=ax.transAxes,
+    ax.plot([0.4, 0.6], [0.125, 0.125], transform=ax.transAxes,
             color=THEME['text'], linewidth=1, zorder=15)
 
-    ax.text(0.5, 0.11, country.upper(), transform=ax.transAxes,
+    ax.text(0.5, 0.10, country.upper(), transform=ax.transAxes,
             color=THEME['text'], ha='center', fontproperties=font_sub, zorder=15)
 
     lat, lon = point
@@ -493,7 +501,7 @@ def create_poster(city, country, point, dist, output_file):
     if lon < 0:
         coords = coords.replace("E", "W")
 
-    ax.text(0.5, 0.075, coords, transform=ax.transAxes,
+    ax.text(0.5, 0.07, coords, transform=ax.transAxes,
             color=THEME['text'], alpha=0.7, ha='center', fontproperties=font_coords, zorder=15)
 
     # --- ATTRIBUTION (bottom right) ---
