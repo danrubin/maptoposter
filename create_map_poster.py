@@ -148,9 +148,9 @@ def create_gradient_fade(ax, color, location='bottom', zorder=10):
 
     if location == 'bottom':
         y_start = 0
-        y_end = 0.25
+        y_end = 0.15  # Reduced from 0.25 to give text clean space
     else:
-        y_start = 0.75
+        y_start = 0.85  # Adjusted from 0.75 for symmetry
         y_end = 1.0
 
     # Create gradient using rectangles in axis coordinates
