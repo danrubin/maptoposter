@@ -1,3 +1,19 @@
+#!/usr/bin/env python3
+"""
+City Map Poster Generator
+Generate beautiful, minimalist map posters for any city in the world.
+"""
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "osmnx>=2.0.7",
+#   "matplotlib>=3.10.8",
+#   "geopandas>=1.1.2",
+#   "geopy>=2.4.1",
+#   "tqdm>=4.67.1",
+#   "numpy>=2.4.0",
+# ]
+# ///
 import osmnx as ox
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
@@ -15,26 +31,43 @@ THEMES_DIR = "themes"
 FONTS_DIR = "fonts"
 POSTERS_DIR = "posters"
 
-def load_fonts():
+def load_fonts(typeface='Roboto'):
     """
-    Load Roboto fonts from the fonts directory.
-    Returns dict with font paths for different weights.
+    Load fonts from the fonts directory.
+
+    Args:
+        typeface (str): Name of the typeface to use (default: 'Roboto')
+                       Available options: 'Roboto' or any custom font family
+                       with Bold, Regular, and Light weights in the fonts/ directory.
+
+    Returns:
+        dict: Font paths for different weights, or None if fonts not found.
+
+    Usage:
+        # Use default Roboto fonts
+        fonts = load_fonts()
+
+        # Use a custom typeface (ensure CustomFont-Bold.ttf, etc. are in fonts/)
+        fonts = load_fonts('CustomFont')
     """
     fonts = {
-        'bold': os.path.join(FONTS_DIR, 'Roboto-Bold.ttf'),
-        'regular': os.path.join(FONTS_DIR, 'Roboto-Regular.ttf'),
-        'light': os.path.join(FONTS_DIR, 'Roboto-Light.ttf')
+        'bold': os.path.join(FONTS_DIR, f'{typeface}-Bold.ttf'),
+        'regular': os.path.join(FONTS_DIR, f'{typeface}-Regular.ttf'),
+        'light': os.path.join(FONTS_DIR, f'{typeface}-Light.ttf')
     }
-    
+
     # Verify fonts exist
     for weight, path in fonts.items():
         if not os.path.exists(path):
             print(f"⚠ Font not found: {path}")
             return None
-    
+
     return fonts
 
-FONTS = load_fonts()
+# Default to Roboto fonts (can be changed by modifying the argument below)
+# To use a different typeface, replace 'Roboto' with your font name:
+# FONTS = load_fonts('YourFontName')
+FONTS = load_fonts('Roboto')
 
 def generate_output_filename(city, theme_name):
     """
@@ -100,16 +133,21 @@ THEME = None  # Will be loaded later
 def create_gradient_fade(ax, color, location='bottom', zorder=10):
     """
     Creates a fade effect at the top or bottom of the map.
+    Fixed to prevent axis distortion by preserving aspect ratio and limits.
     """
+    # Store current axis limits and aspect to restore after gradient
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+
     vals = np.linspace(0, 1, 256).reshape(-1, 1)
     gradient = np.hstack((vals, vals))
-    
+
     rgb = mcolors.to_rgb(color)
     my_colors = np.zeros((256, 4))
     my_colors[:, 0] = rgb[0]
     my_colors[:, 1] = rgb[1]
     my_colors[:, 2] = rgb[2]
-    
+
     if location == 'bottom':
         my_colors[:, 3] = np.linspace(1, 0, 256)
         extent_y_start = 0
@@ -120,16 +158,20 @@ def create_gradient_fade(ax, color, location='bottom', zorder=10):
         extent_y_end = 1.0
 
     custom_cmap = mcolors.ListedColormap(my_colors)
-    
-    xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
+
     y_range = ylim[1] - ylim[0]
-    
     y_bottom = ylim[0] + y_range * extent_y_start
     y_top = ylim[0] + y_range * extent_y_end
-    
-    ax.imshow(gradient, extent=[xlim[0], xlim[1], y_bottom, y_top], 
-              aspect='auto', cmap=custom_cmap, zorder=zorder, origin='lower')
+
+    # Use interpolation='bilinear' for smoother gradients
+    # Set aspect to match the data coordinate system to prevent distortion
+    im = ax.imshow(gradient, extent=[xlim[0], xlim[1], y_bottom, y_top],
+                   aspect='auto', cmap=custom_cmap, zorder=zorder, origin='lower',
+                   interpolation='bilinear')
+
+    # Critical fix: Restore axis limits to prevent distortion
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
 
 def get_edge_colors_by_type(G):
     """
@@ -193,6 +235,38 @@ def get_edge_widths_by_type(G):
     
     return edge_widths
 
+def calculate_city_name_font_size(city, base_size=60, min_size=30, max_chars=15):
+    """
+    Calculate appropriate font size for city name based on length.
+    Longer city names get smaller font sizes to prevent cutoff.
+
+    Args:
+        city (str): City name
+        base_size (int): Font size for short city names (default: 60)
+        min_size (int): Minimum font size for very long names (default: 30)
+        max_chars (int): Character count at which scaling starts (default: 15)
+
+    Returns:
+        int: Calculated font size
+
+    Usage:
+        # Automatically scales based on city name length
+        font_size = calculate_city_name_font_size("San Francisco")  # Returns ~48
+        font_size = calculate_city_name_font_size("NYC")            # Returns 60
+    """
+    # Account for spacing added between characters
+    spaced_length = len(city) * 3 - 2  # Each char + 2 spaces, except last char
+
+    if spaced_length <= max_chars:
+        return base_size
+
+    # Linear scaling from base_size to min_size
+    # Adjust scaling factor based on how much longer than max_chars
+    scale_factor = max(min_size / base_size, 1 - (spaced_length - max_chars) / 50)
+    calculated_size = int(base_size * scale_factor)
+
+    return max(min_size, calculated_size)
+
 def get_coordinates(city, country):
     """
     Fetches coordinates for a given city and country using geopy.
@@ -200,12 +274,12 @@ def get_coordinates(city, country):
     """
     print("Looking up coordinates...")
     geolocator = Nominatim(user_agent="city_map_poster")
-    
+
     # Add a small delay to respect Nominatim's usage policy
     time.sleep(1)
-    
+
     location = geolocator.geocode(f"{city}, {country}")
-    
+
     if location:
         print(f"✓ Found: {location.address}")
         print(f"✓ Coordinates: {location.latitude}, {location.longitude}")
@@ -272,20 +346,23 @@ def create_poster(city, country, point, dist, output_file):
     # Layer 3: Gradients (Top and Bottom)
     create_gradient_fade(ax, THEME['gradient_color'], location='bottom', zorder=10)
     create_gradient_fade(ax, THEME['gradient_color'], location='top', zorder=10)
-    
-    # 4. Typography using Roboto font
+
+    # 4. Typography with dynamic font sizing
+    # Calculate appropriate font size for city name based on length
+    city_font_size = calculate_city_name_font_size(city)
+
     if FONTS:
-        font_main = FontProperties(fname=FONTS['bold'], size=60)
+        font_main = FontProperties(fname=FONTS['bold'], size=city_font_size)
         font_top = FontProperties(fname=FONTS['bold'], size=40)
         font_sub = FontProperties(fname=FONTS['light'], size=22)
         font_coords = FontProperties(fname=FONTS['regular'], size=14)
     else:
         # Fallback to system fonts
-        font_main = FontProperties(family='monospace', weight='bold', size=60)
+        font_main = FontProperties(family='monospace', weight='bold', size=city_font_size)
         font_top = FontProperties(family='monospace', weight='bold', size=40)
         font_sub = FontProperties(family='monospace', weight='normal', size=22)
         font_coords = FontProperties(family='monospace', size=14)
-    
+
     spaced_city = "  ".join(list(city.upper()))
 
     # --- BOTTOM TEXT ---

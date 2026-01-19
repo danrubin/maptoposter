@@ -22,15 +22,30 @@ Generate beautiful, minimalist map posters for any city in the world.
 
 ## Installation
 
+This project uses [uv](https://docs.astral.sh/uv/) for automatic dependency management. No manual setup required!
+
+### Quick Setup
+
 ```bash
-pip install -r requirements.txt
+# Install uv (one-time setup)
+curl -LsSf https://astral.sh/uv/install.sh | sh  # macOS/Linux
 ```
+
+That's it! The script automatically manages its own dependencies using inline metadata (PEP 723).
+
+**Need more details?** See the complete [SETUP_GUIDE.md](SETUP_GUIDE.md) for troubleshooting and alternative methods.
 
 ## Usage
 
 ```bash
-python create_map_poster.py --city <city> --country <country> [options]
+# Recommended method (works on all platforms)
+uv run create_map_poster.py --city <city> --country <country> [options]
+
+# Or use the convenient wrapper script
+./run.sh --city <city> --country <country> [options]
 ```
+
+**Why use `uv run`?** The script automatically manages its own dependencies using inline metadata. When you run `uv run create_map_poster.py`, uv automatically creates an isolated environment and installs all required packages.
 
 ### Options
 
@@ -46,34 +61,34 @@ python create_map_poster.py --city <city> --country <country> [options]
 
 ```bash
 # Iconic grid patterns
-python create_map_poster.py -c "New York" -C "USA" -t noir -d 12000           # Manhattan grid
-python create_map_poster.py -c "Barcelona" -C "Spain" -t warm_beige -d 8000   # Eixample district
+uv run create_map_poster.py -c "New York" -C "USA" -t noir -d 12000           # Manhattan grid
+uv run create_map_poster.py -c "Barcelona" -C "Spain" -t warm_beige -d 8000   # Eixample district
 
 # Waterfront & canals
-python create_map_poster.py -c "Venice" -C "Italy" -t blueprint -d 4000       # Canal network
-python create_map_poster.py -c "Amsterdam" -C "Netherlands" -t ocean -d 6000  # Concentric canals
-python create_map_poster.py -c "Dubai" -C "UAE" -t midnight_blue -d 15000     # Palm & coastline
+uv run create_map_poster.py -c "Venice" -C "Italy" -t blueprint -d 4000       # Canal network
+uv run create_map_poster.py -c "Amsterdam" -C "Netherlands" -t ocean -d 6000  # Concentric canals
+uv run create_map_poster.py -c "Dubai" -C "UAE" -t midnight_blue -d 15000     # Palm & coastline
 
 # Radial patterns
-python create_map_poster.py -c "Paris" -C "France" -t pastel_dream -d 10000   # Haussmann boulevards
-python create_map_poster.py -c "Moscow" -C "Russia" -t noir -d 12000          # Ring roads
+uv run create_map_poster.py -c "Paris" -C "France" -t pastel_dream -d 10000   # Haussmann boulevards
+uv run create_map_poster.py -c "Moscow" -C "Russia" -t noir -d 12000          # Ring roads
 
 # Organic old cities
-python create_map_poster.py -c "Tokyo" -C "Japan" -t japanese_ink -d 15000    # Dense organic streets
-python create_map_poster.py -c "Marrakech" -C "Morocco" -t terracotta -d 5000 # Medina maze
-python create_map_poster.py -c "Rome" -C "Italy" -t warm_beige -d 8000        # Ancient layout
+uv run create_map_poster.py -c "Tokyo" -C "Japan" -t japanese_ink -d 15000    # Dense organic streets
+uv run create_map_poster.py -c "Marrakech" -C "Morocco" -t terracotta -d 5000 # Medina maze
+uv run create_map_poster.py -c "Rome" -C "Italy" -t warm_beige -d 8000        # Ancient layout
 
 # Coastal cities
-python create_map_poster.py -c "San Francisco" -C "USA" -t sunset -d 10000    # Peninsula grid
-python create_map_poster.py -c "Sydney" -C "Australia" -t ocean -d 12000      # Harbor city
-python create_map_poster.py -c "Mumbai" -C "India" -t contrast_zones -d 18000 # Coastal peninsula
+uv run create_map_poster.py -c "San Francisco" -C "USA" -t sunset -d 10000    # Peninsula grid
+uv run create_map_poster.py -c "Sydney" -C "Australia" -t ocean -d 12000      # Harbor city
+uv run create_map_poster.py -c "Mumbai" -C "India" -t contrast_zones -d 18000 # Coastal peninsula
 
 # River cities
-python create_map_poster.py -c "London" -C "UK" -t noir -d 15000              # Thames curves
-python create_map_poster.py -c "Budapest" -C "Hungary" -t copper_patina -d 8000  # Danube split
+uv run create_map_poster.py -c "London" -C "UK" -t noir -d 15000              # Thames curves
+uv run create_map_poster.py -c "Budapest" -C "Hungary" -t copper_patina -d 8000  # Danube split
 
 # List available themes
-python create_map_poster.py --list-themes
+uv run create_map_poster.py --list-themes
 ```
 
 ### Distance Guide
@@ -137,6 +152,40 @@ Create a JSON file in `themes/` directory:
 }
 ```
 
+## Custom Typefaces
+
+The script uses Roboto by default, but you can use any custom typeface:
+
+### How to Add a Custom Typeface
+
+1. Place your font files in the `fonts/` directory with these names:
+   - `YourFont-Bold.ttf`
+   - `YourFont-Regular.ttf`
+   - `YourFont-Light.ttf`
+
+2. Edit `create_map_poster.py` line 69:
+   ```python
+   # Change from:
+   FONTS = load_fonts('Roboto')
+
+   # To:
+   FONTS = load_fonts('YourFont')
+   ```
+
+3. Run the script as normal:
+   ```bash
+   uv run create_map_poster.py -c "Paris" -C "France" -t noir
+   ```
+
+### Dynamic Text Scaling
+
+City names automatically scale to prevent cutoff:
+- Short names (e.g., "NYC") use the full 60pt font size
+- Long names (e.g., "San Francisco") automatically scale down
+- Very long names (e.g., "Llanfairpwllgwyngyll") reduce to minimum 30pt
+
+This ensures all city names fit properly without manual adjustment.
+
 ## Project Structure
 
 ```
@@ -177,6 +226,8 @@ Quick reference for contributors who want to extend or modify the script.
 | `get_edge_widths_by_type()` | Road width by importance | Adjusting line weights |
 | `create_gradient_fade()` | Top/bottom fade effect | Modifying gradient overlay |
 | `load_theme()` | JSON theme → dict | Adding new theme properties |
+| `load_fonts()` | Load custom typeface files | Adding/changing fonts |
+| `calculate_city_name_font_size()` | Auto-scale text for long names | Adjusting text scaling behavior |
 
 ### Rendering Layers (z-order)
 
