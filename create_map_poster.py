@@ -545,16 +545,22 @@ def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), 
     # Progress bar for data fetching
     with tqdm(total=3, desc="Fetching map data", unit="step", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
         # 1. Fetch Street Network using bbox
+        # OSMnx 2.0 API: bbox parameter is (west, south, east, north)
         pbar.set_description("Downloading street network")
-        G = ox.graph_from_bbox(bbox['north'], bbox['south'], bbox['east'], bbox['west'], network_type='all')
+        G = ox.graph_from_bbox(
+            bbox=(bbox['west'], bbox['south'], bbox['east'], bbox['north']),
+            network_type='all'
+        )
         pbar.update(1)
         time.sleep(0.5)  # Rate limit between requests
 
         # 2. Fetch Water Features using bbox
         pbar.set_description("Downloading water features")
         try:
-            water = ox.features_from_bbox(bbox['north'], bbox['south'], bbox['east'], bbox['west'],
-                                         tags={'natural': 'water', 'waterway': 'riverbank'})
+            water = ox.features_from_bbox(
+                bbox=(bbox['west'], bbox['south'], bbox['east'], bbox['north']),
+                tags={'natural': 'water', 'waterway': 'riverbank'}
+            )
         except:
             water = None
         pbar.update(1)
@@ -563,8 +569,10 @@ def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), 
         # 3. Fetch Parks using bbox
         pbar.set_description("Downloading parks/green spaces")
         try:
-            parks = ox.features_from_bbox(bbox['north'], bbox['south'], bbox['east'], bbox['west'],
-                                         tags={'leisure': 'park', 'landuse': 'grass'})
+            parks = ox.features_from_bbox(
+                bbox=(bbox['west'], bbox['south'], bbox['east'], bbox['north']),
+                tags={'leisure': 'park', 'landuse': 'grass'}
+            )
         except:
             parks = None
         pbar.update(1)
