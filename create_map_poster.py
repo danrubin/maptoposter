@@ -132,46 +132,133 @@ THEME = None  # Will be loaded later
 
 def create_gradient_fade(ax, color, location='bottom', zorder=10):
     """
-    Creates a fade effect at the top or bottom of the map.
-    Fixed to prevent axis distortion by preserving aspect ratio and limits.
-    """
-    # Store current axis limits and aspect to restore after gradient
-    xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
+    Creates a fade effect using transform coordinates to avoid distortion.
 
-    vals = np.linspace(0, 1, 256).reshape(-1, 1)
-    gradient = np.hstack((vals, vals))
+    FIX APPROACH 1 (ACTIVE): Rectangle patches with transAxes
+    - Uses normalized axis coordinates (0-1) independent of data
+    - No interaction with xlim/ylim, preventing distortion
+    - 100 thin rectangles with varying alpha create gradient
+
+    To test alternative fixes, comment this out and uncomment one below.
+    """
+    from matplotlib.patches import Rectangle
+
+    # Use normalized figure coordinates (0-1) instead of data coordinates
+    # This prevents any interaction with the axis limits
 
     rgb = mcolors.to_rgb(color)
-    my_colors = np.zeros((256, 4))
-    my_colors[:, 0] = rgb[0]
-    my_colors[:, 1] = rgb[1]
-    my_colors[:, 2] = rgb[2]
+    steps = 100  # Number of gradient steps
 
     if location == 'bottom':
-        my_colors[:, 3] = np.linspace(1, 0, 256)
-        extent_y_start = 0
-        extent_y_end = 0.25
+        y_start = 0
+        y_end = 0.25
     else:
-        my_colors[:, 3] = np.linspace(0, 1, 256)
-        extent_y_start = 0.75
-        extent_y_end = 1.0
+        y_start = 0.75
+        y_end = 1.0
 
-    custom_cmap = mcolors.ListedColormap(my_colors)
+    # Create gradient using rectangles in axis coordinates
+    for i in range(steps):
+        y_pos = y_start + (y_end - y_start) * i / steps
+        height = (y_end - y_start) / steps
 
-    y_range = ylim[1] - ylim[0]
-    y_bottom = ylim[0] + y_range * extent_y_start
-    y_top = ylim[0] + y_range * extent_y_end
+        # Calculate alpha for gradient effect
+        if location == 'bottom':
+            alpha = 1 - (i / steps)  # Fade from opaque to transparent
+        else:
+            alpha = i / steps  # Fade from transparent to opaque
 
-    # Use interpolation='bilinear' for smoother gradients
-    # Set aspect to match the data coordinate system to prevent distortion
-    im = ax.imshow(gradient, extent=[xlim[0], xlim[1], y_bottom, y_top],
-                   aspect='auto', cmap=custom_cmap, zorder=zorder, origin='lower',
-                   interpolation='bilinear')
+        rect = Rectangle((0, y_pos), 1, height,
+                        transform=ax.transAxes,  # Use axis coordinates, not data
+                        facecolor=rgb, edgecolor='none',
+                        alpha=alpha, zorder=zorder,
+                        clip_on=False)  # Don't clip to axis bounds
+        ax.add_patch(rect)
 
-    # Critical fix: Restore axis limits to prevent distortion
-    ax.set_xlim(xlim)
-    ax.set_ylim(ylim)
+
+# ALTERNATIVE FIX 2: imshow with explicit aspect ratio
+# Uncomment to test this approach
+# def create_gradient_fade(ax, color, location='bottom', zorder=10):
+#     """
+#     FIX APPROACH 2: imshow with locked aspect ratio
+#     Uses imshow but locks axis aspect ratio before and after
+#     """
+#     xlim = ax.get_xlim()
+#     ylim = ax.get_ylim()
+#
+#     # Calculate and lock aspect ratio
+#     x_range = xlim[1] - xlim[0]
+#     y_range = ylim[1] - ylim[0]
+#     aspect_ratio = y_range / x_range
+#
+#     vals = np.linspace(0, 1, 256).reshape(-1, 1)
+#     gradient = np.hstack((vals, vals))
+#
+#     rgb = mcolors.to_rgb(color)
+#     my_colors = np.zeros((256, 4))
+#     my_colors[:, 0] = rgb[0]
+#     my_colors[:, 1] = rgb[1]
+#     my_colors[:, 2] = rgb[2]
+#
+#     if location == 'bottom':
+#         my_colors[:, 3] = np.linspace(1, 0, 256)
+#         extent_y_start = 0
+#         extent_y_end = 0.25
+#     else:
+#         my_colors[:, 3] = np.linspace(0, 1, 256)
+#         extent_y_start = 0.75
+#         extent_y_end = 1.0
+#
+#     custom_cmap = mcolors.ListedColormap(my_colors)
+#     y_bottom = ylim[0] + y_range * extent_y_start
+#     y_top = ylim[0] + y_range * extent_y_end
+#
+#     # Use calculated aspect ratio instead of 'auto'
+#     im = ax.imshow(gradient, extent=[xlim[0], xlim[1], y_bottom, y_top],
+#                    aspect=aspect_ratio * 4,  # Scale aspect for gradient region
+#                    cmap=custom_cmap, zorder=zorder, origin='lower',
+#                    interpolation='bilinear')
+#
+#     # Restore limits
+#     ax.set_xlim(xlim)
+#     ax.set_ylim(ylim)
+
+
+# ALTERNATIVE FIX 3: FancyBboxPatch with gradient
+# Uncomment to test this approach
+# def create_gradient_fade(ax, color, location='bottom', zorder=10):
+#     """
+#     FIX APPROACH 3: Polygon fill with gradient simulation
+#     Uses fill_between in axis coordinates
+#     """
+#     import matplotlib.patches as mpatches
+#     from matplotlib.path import Path
+#
+#     rgb = mcolors.to_rgb(color)
+#     steps = 50  # Fewer steps for performance
+#
+#     if location == 'bottom':
+#         y_start = 0
+#         y_end = 0.25
+#     else:
+#         y_start = 0.75
+#         y_end = 1.0
+#
+#     # Create gradient with fill_between
+#     for i in range(steps):
+#         y_low = y_start + (y_end - y_start) * i / steps
+#         y_high = y_start + (y_end - y_start) * (i + 1) / steps
+#
+#         if location == 'bottom':
+#             alpha = 1 - (i / steps)
+#         else:
+#             alpha = i / steps
+#
+#         # Create rectangle using axis transform
+#         rect = mpatches.Rectangle((0, y_low), 1, y_high - y_low,
+#                                   transform=ax.transAxes,
+#                                   facecolor=rgb, edgecolor='none',
+#                                   alpha=alpha, zorder=zorder)
+#         ax.add_patch(rect)
 
 def get_edge_colors_by_type(G):
     """
