@@ -134,20 +134,17 @@ def create_gradient_fade(ax, color, location='bottom', zorder=10):
     """
     Creates a fade effect using transform coordinates to avoid distortion.
 
-    FIX APPROACH 1 (ACTIVE): Rectangle patches with transAxes
+    FIX APPROACH 3 (ACTIVE): Rectangle patches with transAxes (50 steps)
+    - Same as Fix #1 but with 50 steps instead of 100 for better performance
     - Uses normalized axis coordinates (0-1) independent of data
     - No interaction with xlim/ylim, preventing distortion
-    - 100 thin rectangles with varying alpha create gradient
 
-    To test alternative fixes, comment this out and uncomment one below.
+    Note: Fix #1 (100 steps) worked but is commented out below.
     """
     from matplotlib.patches import Rectangle
 
-    # Use normalized figure coordinates (0-1) instead of data coordinates
-    # This prevents any interaction with the axis limits
-
     rgb = mcolors.to_rgb(color)
-    steps = 100  # Number of gradient steps
+    steps = 50  # Fewer steps for better performance
 
     if location == 'bottom':
         y_start = 0
@@ -173,6 +170,32 @@ def create_gradient_fade(ax, color, location='bottom', zorder=10):
                         alpha=alpha, zorder=zorder,
                         clip_on=False)  # Don't clip to axis bounds
         ax.add_patch(rect)
+
+
+# FIX #1 - 100 steps (worked, but commented out in favor of faster 50-step version)
+# def create_gradient_fade(ax, color, location='bottom', zorder=10):
+#     from matplotlib.patches import Rectangle
+#     rgb = mcolors.to_rgb(color)
+#     steps = 100
+#     if location == 'bottom':
+#         y_start = 0
+#         y_end = 0.25
+#     else:
+#         y_start = 0.75
+#         y_end = 1.0
+#     for i in range(steps):
+#         y_pos = y_start + (y_end - y_start) * i / steps
+#         height = (y_end - y_start) / steps
+#         if location == 'bottom':
+#             alpha = 1 - (i / steps)
+#         else:
+#             alpha = i / steps
+#         rect = Rectangle((0, y_pos), 1, height,
+#                         transform=ax.transAxes,
+#                         facecolor=rgb, edgecolor='none',
+#                         alpha=alpha, zorder=zorder,
+#                         clip_on=False)
+#         ax.add_patch(rect)
 
 
 # ALTERNATIVE FIX 2: imshow with explicit aspect ratio
