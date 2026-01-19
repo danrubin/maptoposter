@@ -167,8 +167,7 @@ def create_gradient_fade(ax, color, location='bottom', zorder=10):
         rect = Rectangle((0, y_pos), 1, height,
                         transform=ax.transAxes,  # Use axis coordinates, not data
                         facecolor=rgb, edgecolor='none',
-                        alpha=alpha, zorder=zorder,
-                        clip_on=False)  # Don't clip to axis bounds
+                        alpha=alpha, zorder=zorder)
         ax.add_patch(rect)
 
 
@@ -476,32 +475,33 @@ def create_poster(city, country, point, dist, output_file):
     spaced_city = "  ".join(list(city.upper()))
 
     # --- BOTTOM TEXT ---
+    # Text zorder=15 ensures it appears above gradients (zorder=10)
     ax.text(0.5, 0.14, spaced_city, transform=ax.transAxes,
-            color=THEME['text'], ha='center', fontproperties=font_main, zorder=11)
-    
+            color=THEME['text'], ha='center', fontproperties=font_main, zorder=15)
+
     ax.text(0.5, 0.10, country.upper(), transform=ax.transAxes,
-            color=THEME['text'], ha='center', fontproperties=font_sub, zorder=11)
-    
+            color=THEME['text'], ha='center', fontproperties=font_sub, zorder=15)
+
     lat, lon = point
     coords = f"{lat:.4f}° N / {lon:.4f}° E" if lat >= 0 else f"{abs(lat):.4f}° S / {lon:.4f}° E"
     if lon < 0:
         coords = coords.replace("E", "W")
-    
+
     ax.text(0.5, 0.07, coords, transform=ax.transAxes,
-            color=THEME['text'], alpha=0.7, ha='center', fontproperties=font_coords, zorder=11)
-    
-    ax.plot([0.4, 0.6], [0.125, 0.125], transform=ax.transAxes, 
-            color=THEME['text'], linewidth=1, zorder=11)
+            color=THEME['text'], alpha=0.7, ha='center', fontproperties=font_coords, zorder=15)
+
+    ax.plot([0.4, 0.6], [0.125, 0.125], transform=ax.transAxes,
+            color=THEME['text'], linewidth=1, zorder=15)
 
     # --- ATTRIBUTION (bottom right) ---
     if FONTS:
         font_attr = FontProperties(fname=FONTS['light'], size=8)
     else:
         font_attr = FontProperties(family='monospace', size=8)
-    
+
     ax.text(0.98, 0.02, "© OpenStreetMap contributors", transform=ax.transAxes,
-            color=THEME['text'], alpha=0.5, ha='right', va='bottom', 
-            fontproperties=font_attr, zorder=11)
+            color=THEME['text'], alpha=0.5, ha='right', va='bottom',
+            fontproperties=font_attr, zorder=15)
 
     # 5. Save
     print(f"Saving to {output_file}...")
