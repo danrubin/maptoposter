@@ -31,6 +31,18 @@ THEMES_DIR = "themes"
 FONTS_DIR = "fonts"
 POSTERS_DIR = "posters"
 
+# Aspect ratio presets
+ASPECT_RATIOS = {
+    'poster': (3, 4),      # 3:4 - Classic poster (12x16 default)
+    'square': (1, 1),      # 1:1 - Instagram square
+    'landscape': (4, 3),   # 4:3 - Landscape orientation
+    'wide': (16, 9),       # 16:9 - Widescreen
+    'ultra': (21, 9),      # 21:9 - Ultra-wide
+    'tall': (9, 16),       # 9:16 - Portrait/Stories
+    'a4': (210, 297),      # A4 paper (portrait)
+    'letter': (8.5, 11),   # US Letter (portrait)
+}
+
 def load_fonts(typeface='Roboto'):
     """
     Load fonts from the fonts directory.
@@ -376,6 +388,119 @@ def calculate_city_name_font_size(city, base_size=60, min_size=30, max_chars=15)
 
     return max(min_size, calculated_size)
 
+def parse_aspect_ratio(ratio_str):
+    """
+    Parse aspect ratio from string format.
+
+    Args:
+        ratio_str (str): Ratio as 'preset' or 'width:height' (e.g., 'square', '16:9', '3:4')
+
+    Returns:
+        tuple: (width, height) ratio
+
+    Examples:
+        parse_aspect_ratio('square') → (1, 1)
+        parse_aspect_ratio('16:9') → (16, 9)
+        parse_aspect_ratio('poster') → (3, 4)
+    """
+    # Check if it's a preset
+    if ratio_str in ASPECT_RATIOS:
+        return ASPECT_RATIOS[ratio_str]
+
+    # Parse custom ratio (e.g., "16:9" or "3:4")
+    try:
+        parts = ratio_str.split(':')
+        if len(parts) == 2:
+            width = float(parts[0])
+            height = float(parts[1])
+            return (width, height)
+    except ValueError:
+        pass
+
+    raise ValueError(f"Invalid aspect ratio: '{ratio_str}'. Use a preset ({', '.join(ASPECT_RATIOS.keys())}) or format like '16:9'")
+
+
+def calculate_figure_size(ratio, base_width=12):
+    """
+    Calculate figure size in inches based on aspect ratio.
+
+    Args:
+        ratio (tuple): (width, height) aspect ratio
+        base_width (int): Base width in inches (default: 12)
+
+    Returns:
+        tuple: (width_inches, height_inches)
+
+    Examples:
+        calculate_figure_size((3, 4), 12) → (12, 16)
+        calculate_figure_size((16, 9), 12) → (12, 6.75)
+    """
+    width_ratio, height_ratio = ratio
+    height = base_width * (height_ratio / width_ratio)
+    return (base_width, height)
+
+
+def calculate_map_bbox(point, dist, aspect_ratio):
+    """
+    Calculate appropriate bounding box for map based on aspect ratio.
+
+    For non-square ratios, adjusts the bbox to match the canvas shape,
+    ensuring the map doesn't appear stretched or have excessive padding.
+
+    Args:
+        point (tuple): (latitude, longitude) center point
+        dist (int): Base distance in meters
+        aspect_ratio (tuple): (width, height) ratio
+
+    Returns:
+        dict: Bounding box parameters for osmnx with dist adjustments
+
+    Examples:
+        # Square (1:1) - equal in all directions
+        calculate_map_bbox((lat, lon), 10000, (1, 1))
+
+        # Wide (16:9) - extends horizontally
+        calculate_map_bbox((lat, lon), 10000, (16, 9))
+
+        # Tall (9:16) - extends vertically
+        calculate_map_bbox((lat, lon), 10000, (9, 16))
+    """
+    width_ratio, height_ratio = aspect_ratio
+
+    # Calculate distance multipliers based on ratio
+    if width_ratio > height_ratio:
+        # Landscape: extend horizontally
+        dist_x = dist
+        dist_y = dist * (height_ratio / width_ratio)
+    elif height_ratio > width_ratio:
+        # Portrait: extend vertically
+        dist_x = dist * (width_ratio / height_ratio)
+        dist_y = dist
+    else:
+        # Square: equal in all directions
+        dist_x = dist
+        dist_y = dist
+
+    # Return custom bbox parameters
+    # OSMnx bbox format: (north, south, east, west)
+    lat, lon = point
+
+    # Approximate degrees (rough conversion, works for visualization)
+    # 1 degree latitude ≈ 111km
+    # 1 degree longitude varies by latitude, but we'll use approximate
+    lat_delta = (dist_y / 1000) / 111.0
+    lon_delta = (dist_x / 1000) / (111.0 * abs(np.cos(np.radians(lat))))
+
+    bbox = {
+        'north': lat + lat_delta,
+        'south': lat - lat_delta,
+        'east': lon + lon_delta,
+        'west': lon - lon_delta
+    }
+
+    return bbox
+
+
 def get_coordinates(city, country):
     """
     Fetches coordinates for a given city and country using geopy.
@@ -396,39 +521,62 @@ def get_coordinates(city, country):
     else:
         raise ValueError(f"Could not find coordinates for {city}, {country}")
 
-def create_poster(city, country, point, dist, output_file):
+def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), dpi=300, base_width=12):
+    """
+    Create a map poster with customizable aspect ratio and resolution.
+
+    Args:
+        city (str): City name
+        country (str): Country name
+        point (tuple): (latitude, longitude) coordinates
+        dist (int): Base distance in meters for map coverage
+        output_file (str): Output file path
+        aspect_ratio (tuple): (width, height) ratio (default: (3, 4) for poster)
+        dpi (int): Resolution in dots per inch (default: 300)
+        base_width (int): Base width in inches (default: 12)
+    """
     print(f"\nGenerating map for {city}, {country}...")
-    
+    print(f"Aspect ratio: {aspect_ratio[0]}:{aspect_ratio[1]}")
+    print(f"Resolution: {dpi} DPI")
+
+    # Calculate map bounding box based on aspect ratio
+    bbox = calculate_map_bbox(point, dist, aspect_ratio)
+
     # Progress bar for data fetching
     with tqdm(total=3, desc="Fetching map data", unit="step", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
-        # 1. Fetch Street Network
+        # 1. Fetch Street Network using bbox
         pbar.set_description("Downloading street network")
-        G = ox.graph_from_point(point, dist=dist, dist_type='bbox', network_type='all')
+        G = ox.graph_from_bbox(bbox['north'], bbox['south'], bbox['east'], bbox['west'], network_type='all')
         pbar.update(1)
         time.sleep(0.5)  # Rate limit between requests
-        
-        # 2. Fetch Water Features
+
+        # 2. Fetch Water Features using bbox
         pbar.set_description("Downloading water features")
         try:
-            water = ox.features_from_point(point, tags={'natural': 'water', 'waterway': 'riverbank'}, dist=dist)
+            water = ox.features_from_bbox(bbox['north'], bbox['south'], bbox['east'], bbox['west'],
+                                         tags={'natural': 'water', 'waterway': 'riverbank'})
         except:
             water = None
         pbar.update(1)
         time.sleep(0.3)
-        
-        # 3. Fetch Parks
+
+        # 3. Fetch Parks using bbox
         pbar.set_description("Downloading parks/green spaces")
         try:
-            parks = ox.features_from_point(point, tags={'leisure': 'park', 'landuse': 'grass'}, dist=dist)
+            parks = ox.features_from_bbox(bbox['north'], bbox['south'], bbox['east'], bbox['west'],
+                                         tags={'leisure': 'park', 'landuse': 'grass'})
         except:
             parks = None
         pbar.update(1)
     
     print("✓ All data downloaded successfully!")
-    
-    # 2. Setup Plot
+
+    # 2. Setup Plot with calculated figure size
     print("Rendering map...")
-    fig, ax = plt.subplots(figsize=(12, 16), facecolor=THEME['bg'])
+    figsize = calculate_figure_size(aspect_ratio, base_width)
+    print(f"Canvas size: {figsize[0]:.1f}\" × {figsize[1]:.1f}\" ({figsize[0]*dpi:.0f}px × {figsize[1]*dpi:.0f}px)")
+
+    fig, ax = plt.subplots(figsize=figsize, facecolor=THEME['bg'])
     ax.set_facecolor(THEME['bg'])
     ax.set_position([0, 0, 1, 1])
     
@@ -516,9 +664,10 @@ def create_poster(city, country, point, dist, output_file):
 
     # 5. Save
     print(f"Saving to {output_file}...")
-    plt.savefig(output_file, dpi=300, facecolor=THEME['bg'])
+    plt.savefig(output_file, dpi=dpi, facecolor=THEME['bg'])
     plt.close()
     print(f"✓ Done! Poster saved as {output_file}")
+    print(f"Final resolution: {figsize[0]*dpi:.0f}px × {figsize[1]*dpi:.0f}px")
 
 def print_examples():
     """Print usage examples."""
@@ -582,7 +731,7 @@ def list_themes():
     if not available_themes:
         print("No themes found in 'themes/' directory.")
         return
-    
+
     print("\nAvailable Themes:")
     print("-" * 60)
     for theme_name in available_themes:
@@ -601,6 +750,22 @@ def list_themes():
             print(f"    {description}")
         print()
 
+
+def list_aspect_ratios():
+    """List all available aspect ratio presets."""
+    print("\nAvailable Aspect Ratio Presets:")
+    print("-" * 60)
+
+    for name, (w, h) in ASPECT_RATIOS.items():
+        # Calculate example dimensions at 12" width
+        figsize = calculate_figure_size((w, h), 12)
+        print(f"  {name:<12} {w}:{h:<8} → {figsize[0]:.1f}\" × {figsize[1]:.1f}\" (at 12\" width)")
+
+    print("\nYou can also use custom ratios:")
+    print("  Example: --ratio 16:9")
+    print("  Example: --ratio 21:9")
+    print()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate beautiful map posters for any city",
@@ -618,7 +783,14 @@ Examples:
     parser.add_argument('--country', '-C', type=str, help='Country name')
     parser.add_argument('--theme', '-t', type=str, default='feature_based', help='Theme name (default: feature_based)')
     parser.add_argument('--distance', '-d', type=int, default=29000, help='Map radius in meters (default: 29000)')
+    parser.add_argument('--ratio', '-r', type=str, default='poster',
+                       help=f'Aspect ratio: preset ({", ".join(ASPECT_RATIOS.keys())}) or custom (e.g., 16:9) (default: poster)')
+    parser.add_argument('--dpi', type=int, default=300,
+                       help='Resolution in dots per inch (default: 300)')
+    parser.add_argument('--width', '-w', type=int, default=12,
+                       help='Base width in inches (default: 12)')
     parser.add_argument('--list-themes', action='store_true', help='List all available themes')
+    parser.add_argument('--list-ratios', action='store_true', help='List all available aspect ratio presets')
     
     args = parser.parse_args()
     
@@ -631,32 +803,45 @@ Examples:
     if args.list_themes:
         list_themes()
         os.sys.exit(0)
-    
+
+    # List aspect ratios if requested
+    if args.list_ratios:
+        list_aspect_ratios()
+        os.sys.exit(0)
+
     # Validate required arguments
     if not args.city or not args.country:
         print("Error: --city and --country are required.\n")
         print_examples()
         os.sys.exit(1)
-    
+
     # Validate theme exists
     available_themes = get_available_themes()
     if args.theme not in available_themes:
         print(f"Error: Theme '{args.theme}' not found.")
         print(f"Available themes: {', '.join(available_themes)}")
         os.sys.exit(1)
-    
+
+    # Parse aspect ratio
+    try:
+        aspect_ratio = parse_aspect_ratio(args.ratio)
+    except ValueError as e:
+        print(f"Error: {e}")
+        os.sys.exit(1)
+
     print("=" * 50)
     print("City Map Poster Generator")
     print("=" * 50)
-    
+
     # Load theme
     THEME = load_theme(args.theme)
-    
+
     # Get coordinates and generate poster
     try:
         coords = get_coordinates(args.city, args.country)
         output_file = generate_output_filename(args.city, args.theme)
-        create_poster(args.city, args.country, coords, args.distance, output_file)
+        create_poster(args.city, args.country, coords, args.distance, output_file,
+                     aspect_ratio=aspect_ratio, dpi=args.dpi, base_width=args.width)
         
         print("\n" + "=" * 50)
         print("✓ Poster generation complete!")
