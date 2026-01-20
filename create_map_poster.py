@@ -521,7 +521,7 @@ def get_coordinates(city, country):
     else:
         raise ValueError(f"Could not find coordinates for {city}, {country}")
 
-def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), dpi=300, base_width=12):
+def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), dpi=300, base_width=12, enable_gradients=True):
     """
     Create a map poster with customizable aspect ratio and resolution.
 
@@ -534,6 +534,7 @@ def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), 
         aspect_ratio (tuple): (width, height) ratio (default: (3, 4) for poster)
         dpi (int): Resolution in dots per inch (default: 300)
         base_width (int): Base width in inches (default: 12)
+        enable_gradients (bool): Whether to apply gradient overlays (default: True)
     """
     print(f"\nGenerating map for {city}, {country}...")
     print(f"Aspect ratio: {aspect_ratio[0]}:{aspect_ratio[1]}")
@@ -608,9 +609,10 @@ def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), 
         show=False, close=False
     )
     
-    # Layer 3: Gradients (Top and Bottom)
-    create_gradient_fade(ax, THEME['gradient_color'], location='bottom', zorder=10)
-    create_gradient_fade(ax, THEME['gradient_color'], location='top', zorder=10)
+    # Layer 3: Gradients (Top and Bottom) - optional
+    if enable_gradients:
+        create_gradient_fade(ax, THEME['gradient_color'], location='bottom', zorder=10)
+        create_gradient_fade(ax, THEME['gradient_color'], location='top', zorder=10)
 
     # 4. Typography with dynamic font sizing
     # Calculate appropriate font size for city name based on length
@@ -797,6 +799,8 @@ Examples:
                        help='Resolution in dots per inch (default: 300)')
     parser.add_argument('--width', '-w', type=int, default=12,
                        help='Base width in inches (default: 12)')
+    parser.add_argument('--no-gradient', action='store_true',
+                       help='Disable gradient overlays at top and bottom')
     parser.add_argument('--list-themes', action='store_true', help='List all available themes')
     parser.add_argument('--list-ratios', action='store_true', help='List all available aspect ratio presets')
     
@@ -849,7 +853,8 @@ Examples:
         coords = get_coordinates(args.city, args.country)
         output_file = generate_output_filename(args.city, args.theme)
         create_poster(args.city, args.country, coords, args.distance, output_file,
-                     aspect_ratio=aspect_ratio, dpi=args.dpi, base_width=args.width)
+                     aspect_ratio=aspect_ratio, dpi=args.dpi, base_width=args.width,
+                     enable_gradients=not args.no_gradient)
         
         print("\n" + "=" * 50)
         print("✓ Poster generation complete!")
