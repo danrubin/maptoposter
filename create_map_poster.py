@@ -472,30 +472,17 @@ def calculate_map_bbox(point, dist, aspect_ratio, fill=False):
     width_ratio, height_ratio = aspect_ratio
 
     # Calculate distance multipliers based on ratio
+    # Fill mode uses same bbox size but different OSMnx parameters (retain_all, truncate_by_edge)
     if width_ratio > height_ratio:
-        # Landscape: width is wider
-        if fill:
-            # Fill: extend height to match aspect ratio, ensuring full coverage
-            # Use dist for height (smaller dimension), scale width proportionally
-            dist_y = dist
-            dist_x = dist * (width_ratio / height_ratio)
-        else:
-            # Standard: use dist for width (larger dimension), constrain height
-            dist_x = dist
-            dist_y = dist * (height_ratio / width_ratio)
+        # Landscape: extend horizontally
+        dist_x = dist
+        dist_y = dist * (height_ratio / width_ratio)
     elif height_ratio > width_ratio:
-        # Portrait: height is taller
-        if fill:
-            # Fill: extend width to match aspect ratio, ensuring full coverage
-            # Use dist for width (smaller dimension), scale height proportionally
-            dist_x = dist
-            dist_y = dist * (height_ratio / width_ratio)
-        else:
-            # Standard: use dist for height (larger dimension), constrain width
-            dist_x = dist * (width_ratio / height_ratio)
-            dist_y = dist
+        # Portrait: extend vertically
+        dist_x = dist * (width_ratio / height_ratio)
+        dist_y = dist
     else:
-        # Square: equal in all directions (fill and standard are the same)
+        # Square: equal in all directions
         dist_x = dist
         dist_y = dist
 
@@ -573,12 +560,13 @@ def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), 
     with tqdm(total=3, desc="Fetching map data", unit="step", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
         # 1. Fetch Street Network using bbox
         # OSMnx 2.0 API: bbox parameter is (west, south, east, north)
-        # truncate_by_edge=True in fill mode ensures complete roads at boundaries
+        # Fill mode parameters ensure we get ALL roads within bbox, including disconnected segments
         pbar.set_description("Downloading street network")
         G = ox.graph_from_bbox(
             bbox=(bbox['west'], bbox['south'], bbox['east'], bbox['north']),
             network_type='all',
-            truncate_by_edge=fill  # Only extend beyond bbox in fill mode
+            truncate_by_edge=fill,  # Extend beyond bbox edges in fill mode
+            retain_all=fill  # Keep disconnected road segments in fill mode
         )
         pbar.update(1)
         time.sleep(0.5)  # Rate limit between requests
