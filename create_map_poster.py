@@ -550,6 +550,8 @@ def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), 
     print(f"\nGenerating map for {city}, {country}...")
     print(f"Aspect ratio: {aspect_ratio[0]}:{aspect_ratio[1]}")
     print(f"Resolution: {dpi} DPI")
+    if fill:
+        print("Fill mode: ON - Extending map to fill entire frame")
 
     # Calculate map bounding box based on aspect ratio
     bbox = calculate_map_bbox(point, dist, aspect_ratio, fill=fill)
