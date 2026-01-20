@@ -624,7 +624,12 @@ def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), 
         edge_linewidth=edge_widths,
         show=False, close=False
     )
-    
+
+    # Lock axis limits to bbox to ensure consistent scale
+    # This prevents auto-scaling when truncate_by_edge adds roads beyond bbox
+    ax.set_xlim(bbox['west'], bbox['east'])
+    ax.set_ylim(bbox['south'], bbox['north'])
+
     # Layer 3: Gradients (Top and Bottom) - optional
     if enable_gradients:
         create_gradient_fade(ax, THEME['gradient_color'], location='bottom', zorder=10)
