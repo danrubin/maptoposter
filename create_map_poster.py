@@ -472,26 +472,26 @@ def calculate_map_bbox(point, dist, aspect_ratio, fill=False):
     width_ratio, height_ratio = aspect_ratio
 
     # Calculate distance multipliers based on ratio
-    # In standard mode, one dimension is constrained to maintain aspect ratio
-    # In fill mode, BOTH dimensions use the full distance for maximum coverage
     if width_ratio > height_ratio:
         # Landscape: width is wider
         if fill:
-            # Fill: use dist for both, maximize horizontal coverage
-            dist_x = dist
+            # Fill: extend height to match aspect ratio, ensuring full coverage
+            # Use dist for height (smaller dimension), scale width proportionally
             dist_y = dist
+            dist_x = dist * (width_ratio / height_ratio)
         else:
-            # Standard: constrain height
+            # Standard: use dist for width (larger dimension), constrain height
             dist_x = dist
             dist_y = dist * (height_ratio / width_ratio)
     elif height_ratio > width_ratio:
         # Portrait: height is taller
         if fill:
-            # Fill: use dist for both, maximize vertical coverage
+            # Fill: extend width to match aspect ratio, ensuring full coverage
+            # Use dist for width (smaller dimension), scale height proportionally
             dist_x = dist
-            dist_y = dist
+            dist_y = dist * (height_ratio / width_ratio)
         else:
-            # Standard: constrain width
+            # Standard: use dist for height (larger dimension), constrain width
             dist_x = dist * (width_ratio / height_ratio)
             dist_y = dist
     else:
