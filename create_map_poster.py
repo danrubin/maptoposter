@@ -440,7 +440,7 @@ def calculate_figure_size(ratio, base_width=12):
     return (base_width, height)
 
 
-def calculate_map_bbox(point, dist, aspect_ratio):
+def calculate_map_bbox(point, dist, aspect_ratio, fill=False):
     """
     Calculate appropriate bounding box for map based on aspect ratio.
 
@@ -451,6 +451,7 @@ def calculate_map_bbox(point, dist, aspect_ratio):
         point (tuple): (latitude, longitude) center point
         dist (int): Base distance in meters
         aspect_ratio (tuple): (width, height) ratio
+        fill (bool): If True, extends bbox to completely fill the frame in both dimensions
 
     Returns:
         dict: Bounding box parameters for osmnx with dist adjustments
@@ -464,22 +465,31 @@ def calculate_map_bbox(point, dist, aspect_ratio):
 
         # Tall (9:16) - extends vertically
         calculate_map_bbox((lat, lon), 10000, (9, 16))
+
+        # Fill mode - extends to fill entire frame
+        calculate_map_bbox((lat, lon), 10000, (9, 16), fill=True)
     """
     width_ratio, height_ratio = aspect_ratio
 
-    # Calculate distance multipliers based on ratio
-    if width_ratio > height_ratio:
-        # Landscape: extend horizontally
+    if fill:
+        # Fill mode: use distance for the longer dimension, scale both to fill frame
+        # This ensures the map fills the entire canvas even if it extends beyond the base distance
         dist_x = dist
         dist_y = dist * (height_ratio / width_ratio)
-    elif height_ratio > width_ratio:
-        # Portrait: extend vertically
-        dist_x = dist * (width_ratio / height_ratio)
-        dist_y = dist
     else:
-        # Square: equal in all directions
-        dist_x = dist
-        dist_y = dist
+        # Standard mode: calculate distance multipliers based on ratio
+        if width_ratio > height_ratio:
+            # Landscape: extend horizontally
+            dist_x = dist
+            dist_y = dist * (height_ratio / width_ratio)
+        elif height_ratio > width_ratio:
+            # Portrait: extend vertically
+            dist_x = dist * (width_ratio / height_ratio)
+            dist_y = dist
+        else:
+            # Square: equal in all directions
+            dist_x = dist
+            dist_y = dist
 
     # Return custom bbox parameters
     # OSMnx bbox format: (north, south, east, west)
@@ -521,7 +531,7 @@ def get_coordinates(city, country):
     else:
         raise ValueError(f"Could not find coordinates for {city}, {country}")
 
-def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), dpi=300, base_width=12, enable_gradients=True):
+def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), dpi=300, base_width=12, enable_gradients=True, fill=False):
     """
     Create a map poster with customizable aspect ratio and resolution.
 
@@ -535,13 +545,14 @@ def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), 
         dpi (int): Resolution in dots per inch (default: 300)
         base_width (int): Base width in inches (default: 12)
         enable_gradients (bool): Whether to apply gradient overlays (default: True)
+        fill (bool): If True, extends map to completely fill the frame (default: False)
     """
     print(f"\nGenerating map for {city}, {country}...")
     print(f"Aspect ratio: {aspect_ratio[0]}:{aspect_ratio[1]}")
     print(f"Resolution: {dpi} DPI")
 
     # Calculate map bounding box based on aspect ratio
-    bbox = calculate_map_bbox(point, dist, aspect_ratio)
+    bbox = calculate_map_bbox(point, dist, aspect_ratio, fill=fill)
 
     # Progress bar for data fetching
     with tqdm(total=3, desc="Fetching map data", unit="step", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
@@ -801,6 +812,8 @@ Examples:
                        help='Base width in inches (default: 12)')
     parser.add_argument('--no-gradient', action='store_true',
                        help='Disable gradient overlays at top and bottom')
+    parser.add_argument('--fill', action='store_true',
+                       help='Extend map to completely fill the frame, even beyond distance setting')
     parser.add_argument('--list-themes', action='store_true', help='List all available themes')
     parser.add_argument('--list-ratios', action='store_true', help='List all available aspect ratio presets')
     
@@ -854,7 +867,7 @@ Examples:
         output_file = generate_output_filename(args.city, args.theme)
         create_poster(args.city, args.country, coords, args.distance, output_file,
                      aspect_ratio=aspect_ratio, dpi=args.dpi, base_width=args.width,
-                     enable_gradients=not args.no_gradient)
+                     enable_gradients=not args.no_gradient, fill=args.fill)
         
         print("\n" + "=" * 50)
         print("✓ Poster generation complete!")
