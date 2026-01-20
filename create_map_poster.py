@@ -472,10 +472,21 @@ def calculate_map_bbox(point, dist, aspect_ratio, fill=False):
     width_ratio, height_ratio = aspect_ratio
 
     if fill:
-        # Fill mode: use distance for the longer dimension, scale both to fill frame
-        # This ensures the map fills the entire canvas even if it extends beyond the base distance
-        dist_x = dist
-        dist_y = dist * (height_ratio / width_ratio)
+        # Fill mode: extend bbox to completely fill frame in BOTH dimensions
+        # The distance represents the smaller dimension; we extend the larger one
+        # to ensure the map fills the entire canvas
+        if width_ratio > height_ratio:
+            # Landscape (e.g., 16:9): height is smaller, extend width beyond dist
+            dist_y = dist
+            dist_x = dist * (width_ratio / height_ratio)
+        elif height_ratio > width_ratio:
+            # Portrait (e.g., 9:16): width is smaller, extend height beyond dist
+            dist_x = dist
+            dist_y = dist * (height_ratio / width_ratio)
+        else:
+            # Square: equal in all directions
+            dist_x = dist
+            dist_y = dist
     else:
         # Standard mode: calculate distance multipliers based on ratio
         if width_ratio > height_ratio:
