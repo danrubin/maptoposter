@@ -560,10 +560,12 @@ def create_poster(city, country, point, dist, output_file, aspect_ratio=(3, 4), 
     with tqdm(total=3, desc="Fetching map data", unit="step", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
         # 1. Fetch Street Network using bbox
         # OSMnx 2.0 API: bbox parameter is (west, south, east, north)
+        # truncate_by_edge=True ensures we get complete roads even if they extend beyond bbox
         pbar.set_description("Downloading street network")
         G = ox.graph_from_bbox(
             bbox=(bbox['west'], bbox['south'], bbox['east'], bbox['north']),
-            network_type='all'
+            network_type='all',
+            truncate_by_edge=True
         )
         pbar.update(1)
         time.sleep(0.5)  # Rate limit between requests
