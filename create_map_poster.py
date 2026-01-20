@@ -471,36 +471,33 @@ def calculate_map_bbox(point, dist, aspect_ratio, fill=False):
     """
     width_ratio, height_ratio = aspect_ratio
 
-    if fill:
-        # Fill mode: extend bbox to completely fill frame in BOTH dimensions
-        # The distance represents the smaller dimension; we extend the larger one
-        # to ensure the map fills the entire canvas
-        if width_ratio > height_ratio:
-            # Landscape (e.g., 16:9): height is smaller, extend width beyond dist
+    # Calculate distance multipliers based on ratio
+    # In standard mode, one dimension is constrained to maintain aspect ratio
+    # In fill mode, BOTH dimensions use the full distance for maximum coverage
+    if width_ratio > height_ratio:
+        # Landscape: width is wider
+        if fill:
+            # Fill: use dist for both, maximize horizontal coverage
+            dist_x = dist
             dist_y = dist
-            dist_x = dist * (width_ratio / height_ratio)
-        elif height_ratio > width_ratio:
-            # Portrait (e.g., 9:16): width is smaller, extend height beyond dist
+        else:
+            # Standard: constrain height
             dist_x = dist
             dist_y = dist * (height_ratio / width_ratio)
-        else:
-            # Square: equal in all directions
+    elif height_ratio > width_ratio:
+        # Portrait: height is taller
+        if fill:
+            # Fill: use dist for both, maximize vertical coverage
             dist_x = dist
+            dist_y = dist
+        else:
+            # Standard: constrain width
+            dist_x = dist * (width_ratio / height_ratio)
             dist_y = dist
     else:
-        # Standard mode: calculate distance multipliers based on ratio
-        if width_ratio > height_ratio:
-            # Landscape: extend horizontally
-            dist_x = dist
-            dist_y = dist * (height_ratio / width_ratio)
-        elif height_ratio > width_ratio:
-            # Portrait: extend vertically
-            dist_x = dist * (width_ratio / height_ratio)
-            dist_y = dist
-        else:
-            # Square: equal in all directions
-            dist_x = dist
-            dist_y = dist
+        # Square: equal in all directions (fill and standard are the same)
+        dist_x = dist
+        dist_y = dist
 
     # Return custom bbox parameters
     # OSMnx bbox format: (north, south, east, west)
@@ -518,6 +515,11 @@ def calculate_map_bbox(point, dist, aspect_ratio, fill=False):
         'east': lon + lon_delta,
         'west': lon - lon_delta
     }
+
+    # Debug: print bbox coverage (always show for comparison)
+    width_km = dist_x / 1000
+    height_km = dist_y / 1000
+    print(f"  → Bbox coverage: {width_km:.2f}km wide × {height_km:.2f}km tall")
 
     return bbox
 
